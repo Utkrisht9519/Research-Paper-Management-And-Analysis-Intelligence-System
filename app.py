@@ -7,32 +7,27 @@ from backend.mcp_server import call_tool
 
 st.title("📚 Research Paper Assistant")
 
-uploaded_file = st.file_uploader("Upload Research Paper (PDF)", type="pdf")
+pdf = st.file_uploader("Upload PDF", type="pdf")
 
-if uploaded_file:
-    text = extract_text(uploaded_file)
+if pdf:
+    text = extract_text(pdf)
     refs = extract_references(text)
-    save_citations(uploaded_file.name, refs)
+    save_citations(pdf.name, refs)
 
     vs = VectorStore()
     vs.build(text.split("\n"))
 
-    st.success("Paper processed with citations tracked!")
+    st.success("Paper processed")
 
-    query = st.text_input("Ask a question")
+    q = st.text_input("Ask a question")
+    if q:
+        ctx = vs.search(q)
+        st.write(answer_query(q, "\n".join(ctx)))
 
-    if query:
-        chunks = vs.search(query)
-        answer = answer_query(query, chunks)
+        if "wiki" in q.lower():
+            st.subheader("Wiki Context")
+            st.write(call_tool("wiki", q.split()[-1]))
 
-        st.markdown("### Answer")
-        st.write(answer)
-
-        if "wiki" in query.lower():
-            term = query.split()[-1]
-            st.markdown("### Wiki Context")
-            st.write(call_tool("wiki", term))
-
-        st.markdown("### References")
+        st.subheader("References")
         for r in refs[:5]:
             st.write("-", r)

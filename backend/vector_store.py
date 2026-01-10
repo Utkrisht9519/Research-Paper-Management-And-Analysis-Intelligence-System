@@ -1,7 +1,5 @@
+import faiss, os, pickle
 from sentence_transformers import SentenceTransformer
-import faiss
-import os
-import pickle
 from config import VECTOR_DB_PATH, EMBEDDING_MODEL
 
 class VectorStore:
@@ -18,10 +16,6 @@ class VectorStore:
         os.makedirs(VECTOR_DB_PATH, exist_ok=True)
         faiss.write_index(self.index, f"{VECTOR_DB_PATH}/index.faiss")
         pickle.dump(self.docs, open(f"{VECTOR_DB_PATH}/docs.pkl", "wb"))
-
-    def load(self):
-        self.index = faiss.read_index(f"{VECTOR_DB_PATH}/index.faiss")
-        self.docs = pickle.load(open(f"{VECTOR_DB_PATH}/docs.pkl", "rb"))
 
     def search(self, query, k=3):
         emb = self.model.encode([query])
