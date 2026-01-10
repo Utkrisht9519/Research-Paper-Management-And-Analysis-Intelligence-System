@@ -1,4 +1,6 @@
 from groq import Groq
+from config import LLM_MODEL
+
 
 def answer_query(query, context):
     client = Groq()
@@ -14,8 +16,8 @@ def answer_query(query, context):
     """
 
     response = client.chat.completions.create(
-        model="llama3-8b-8192",
-        messages=[{"role": "user", "content": prompt}]
-    )
+    model=LLM_MODEL,
+    messages=[{"role": "user", "content": prompt}],
+)
 
     return response.choices[0].message.content
