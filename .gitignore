@@ -1,16 +1,12 @@
 # Python
 __pycache__/
 *.pyc
-.venv/
+
+# Virtual environment
 venv/
 
 # Streamlit secrets
 .streamlit/secrets.toml
 
-# Data
-data/index/
-data/papers/
-
-# OS
-.DS_Store
-Thumbs.db
+# Data (optional, if large)
+data/
