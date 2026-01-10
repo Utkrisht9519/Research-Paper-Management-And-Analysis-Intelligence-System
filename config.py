@@ -1,0 +1,5 @@
+EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+LLM_MODEL = "llama3-8b-8192"
+VECTOR_DB_PATH = "data/faiss_index"
+CITATION_DB = "data/citations.json"
+WIKI_API = "https://en.wikipedia.org/api/rest_v1/page/summary/"

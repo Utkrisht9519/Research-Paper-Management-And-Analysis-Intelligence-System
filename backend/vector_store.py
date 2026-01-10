@@ -1,27 +1,29 @@
-import os
-import faiss
-import pickle
 from sentence_transformers import SentenceTransformer
+import faiss
+import os
+import pickle
+from config import VECTOR_DB_PATH, EMBEDDING_MODEL
 
-INDEX_PATH = "data/index/faiss.index"
-META_PATH = "data/index/chunks.pkl"
+class VectorStore:
+    def __init__(self):
+        self.model = SentenceTransformer(EMBEDDING_MODEL)
+        self.index = faiss.IndexFlatL2(384)
+        self.docs = []
 
-model = SentenceTransformer("all-MiniLM-L6-v2")
+    def build(self, texts):
+        embeddings = self.model.encode(texts)
+        self.index.add(embeddings)
+        self.docs = texts
 
-def build_or_load_index(chunks=None):
-    if chunks is None and os.path.exists(INDEX_PATH):
-        index = faiss.read_index(INDEX_PATH)
-        with open(META_PATH, "rb") as f:
-            stored_chunks = pickle.load(f)
-        return index, stored_chunks
+        os.makedirs(VECTOR_DB_PATH, exist_ok=True)
+        faiss.write_index(self.index, f"{VECTOR_DB_PATH}/index.faiss")
+        pickle.dump(self.docs, open(f"{VECTOR_DB_PATH}/docs.pkl", "wb"))
 
-    embeddings = model.encode(chunks)
-    index = faiss.IndexFlatL2(embeddings.shape[1])
-    index.add(embeddings)
+    def load(self):
+        self.index = faiss.read_index(f"{VECTOR_DB_PATH}/index.faiss")
+        self.docs = pickle.load(open(f"{VECTOR_DB_PATH}/docs.pkl", "rb"))
 
-    os.makedirs("data/index", exist_ok=True)
-    faiss.write_index(index, INDEX_PATH)
-    with open(META_PATH, "wb") as f:
-        pickle.dump(chunks, f)
-
-    return index, chunks
+    def search(self, query, k=3):
+        emb = self.model.encode([query])
+        _, I = self.index.search(emb, k)
+        return [self.docs[i] for i in I[0]]

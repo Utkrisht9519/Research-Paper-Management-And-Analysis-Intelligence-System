@@ -1,56 +1,38 @@
 import streamlit as st
-import os
+from backend.pdf_parser import extract_text
+from backend.vector_store import VectorStore
+from backend.citation_extractor import extract_references, save_citations
+from backend.rag_engine import answer_query
+from backend.mcp_server import call_tool
 
-from backend.pdf_parser import parse_pdf
-from backend.chunking import chunk_text
-from backend.vector_store import build_or_load_index
-from backend.rag import answer_question
+st.title("📚 Research Paper Assistant")
 
-st.set_page_config(page_title="GA03 Research Assistant")
+uploaded_file = st.file_uploader("Upload Research Paper (PDF)", type="pdf")
 
-st.title("📚 GA03 Research Paper Assistant")
+if uploaded_file:
+    text = extract_text(uploaded_file)
+    refs = extract_references(text)
+    save_citations(uploaded_file.name, refs)
 
-uploaded = st.file_uploader("Upload a research paper (PDF)", type="pdf")
+    vs = VectorStore()
+    vs.build(text.split("\n"))
 
-if uploaded:
-    os.makedirs("data/papers", exist_ok=True)
-    path = f"data/papers/{uploaded.name}"
+    st.success("Paper processed with citations tracked!")
 
-    with open(path, "wb") as f:
-        f.write(uploaded.read())
+    query = st.text_input("Ask a question")
 
-    text = parse_pdf(path)
+    if query:
+        chunks = vs.search(query)
+        answer = answer_query(query, chunks)
 
-    if text.strip():
-        st.success("PDF parsed successfully.")
+        st.markdown("### Answer")
+        st.write(answer)
 
-        # Remove references section before chunking
-        lower_text = text.lower()
-        if "references" in lower_text:
-            text = text[: lower_text.rfind("references")]
+        if "wiki" in query.lower():
+            term = query.split()[-1]
+            st.markdown("### Wiki Context")
+            st.write(call_tool("wiki", term))
 
-        chunks = chunk_text(text)
-
-        build_or_load_index(chunks)
-
-        st.success(f"Indexed {len(chunks)} chunks into FAISS.")
-
-        with st.expander("Preview extracted text"):
-            st.text_area("Text preview", text[:2000], height=300)
-
-        st.markdown("---")
-        st.subheader("Ask a question about this paper")
-
-        question = st.text_input("Your question")
-
-        if question:
-            with st.spinner("Thinking..."):
-                answer = answer_question(question)
-            st.markdown("### Answer")
-            st.write(answer)
-
-    else:
-        st.warning(
-            "No extractable text found. "
-            "This PDF appears to be scanned or image-based."
-        )
+        st.markdown("### References")
+        for r in refs[:5]:
+            st.write("-", r)
