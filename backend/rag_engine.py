@@ -1,57 +1,39 @@
 from groq import Groq
 from config import LLM_MODEL
-from mcp_tools.semantic_search_tool import semantic_search
-from mcp_tools.wiki_tool import wiki_lookup
-from mcp_tools.citation_tool import citation_lookup
-
+from mcp.client.stdio import StdioClient
 
 client = Groq()
 
-
-def run_tools_if_needed(query, paper_id=None):
-    """
-    Simple agent-style tool router.
-    Decides which MCP tool to use based on user intent.
-    """
-
-    tools_used = {}
-
-    # 1. Always get semantic context
-    context = semantic_search({"query": query})
-    tools_used["semantic_search"] = context
-
-    # 2. If user asks for wiki / definition
-    if any(x in query.lower() for x in ["what is", "define", "explain", "wiki"]):
-        term = query.split()[-1]
-        wiki = wiki_lookup({"term": term})
-        tools_used["wiki"] = wiki
-
-    # 3. If user asks for references or citations
-    if paper_id and any(x in query.lower() for x in ["cite", "reference", "paper", "source"]):
-        citations = citation_lookup({"paper_id": paper_id})
-        tools_used["citations"] = citations
-
-    return tools_used
+# Connect to MCP server
+mcp = StdioClient(["python", "mcp_server.py"])
 
 
 def answer_query(query, paper_id=None):
-    tools = run_tools_if_needed(query, paper_id)
+    tools = {}
 
-    context = ""
-    if "semantic_search" in tools:
-        context += "\n".join(tools["semantic_search"])
+    # Semantic search always
+    tools["context"] = mcp.call("semantic_search", {"query": query})
+
+    # Wiki if asked
+    if any(x in query.lower() for x in ["what is", "define", "explain", "wiki"]):
+        term = query.split()[-1]
+        tools["wiki"] = mcp.call("wiki_lookup", {"term": term})
+
+    # Citations if asked
+    if paper_id and any(x in query.lower() for x in ["cite", "reference", "source"]):
+        tools["citations"] = mcp.call("citation_lookup", {"paper_id": paper_id})
+
+    context = "\n".join(tools.get("context", []))
 
     if "wiki" in tools:
-        context += "\n\nWikipedia:\n" + str(tools["wiki"])
+        context += "\n\nWikipedia:\n" + tools["wiki"]
 
     if "citations" in tools:
         context += "\n\nCitations:\n" + "\n".join(tools["citations"][:5])
 
     prompt = f"""
 You are a research assistant.
-
-Use the context below to answer the user's question.
-Always cite sources when possible.
+Use the context below to answer the question and cite sources.
 
 Context:
 {context}

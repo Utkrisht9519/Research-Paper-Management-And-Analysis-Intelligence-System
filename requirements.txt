@@ -5,3 +5,4 @@ PyMuPDF
 groq
 requests
 mcp
+requests
