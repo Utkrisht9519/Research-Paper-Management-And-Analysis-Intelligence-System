@@ -4,5 +4,3 @@ faiss-cpu
 PyMuPDF
 groq
 requests
-mcp
-requests

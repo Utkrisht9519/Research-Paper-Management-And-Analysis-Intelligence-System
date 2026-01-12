@@ -1,29 +1,39 @@
 from groq import Groq
 from config import LLM_MODEL
-from mcp.client.stdio import StdioClient
+from backend.vector_store import VectorStore
+from backend.citation_extractor import get_citations
+import requests
 
 client = Groq()
 
-# Connect to MCP server
-mcp = StdioClient(["python", "mcp_server.py"])
+def wiki_lookup(term):
+    url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{term}"
+    r = requests.get(url)
+    if r.status_code != 200:
+        return ""
+    return r.json().get("extract", "")
 
+def semantic_search(query):
+    vs = VectorStore()
+    vs.load()
+    return vs.search(query, k=5)
 
 def answer_query(query, paper_id=None):
     tools = {}
 
     # Semantic search always
-    tools["context"] = mcp.call("semantic_search", {"query": query})
+    tools["context"] = semantic_search(query)
 
-    # Wiki if asked
+    # Wiki if definition requested
     if any(x in query.lower() for x in ["what is", "define", "explain", "wiki"]):
         term = query.split()[-1]
-        tools["wiki"] = mcp.call("wiki_lookup", {"term": term})
+        tools["wiki"] = wiki_lookup(term)
 
-    # Citations if asked
+    # Citations if requested
     if paper_id and any(x in query.lower() for x in ["cite", "reference", "source"]):
-        tools["citations"] = mcp.call("citation_lookup", {"paper_id": paper_id})
+        tools["citations"] = get_citations(paper_id)
 
-    context = "\n".join(tools.get("context", []))
+    context = "\n".join(tools["context"])
 
     if "wiki" in tools:
         context += "\n\nWikipedia:\n" + tools["wiki"]
